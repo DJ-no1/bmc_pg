@@ -1,0 +1,12 @@
+{
+    "name": "book-my-show-frontend",
+    "version": "1.0.0",
+    "description": "Frontend for Book My Show movie booking application",
+    "scripts": {
+        "dev": "http-server . -p 3000 -c-1",
+        "start": "http-server . -p 3000"
+    },
+    "dependencies": {
+        "http-server": "^14.1.1"
+    }
+}

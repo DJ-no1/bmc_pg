@@ -61,16 +61,16 @@ export const getSeats = async (req, res) => {
 export const bookSeats = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { showId, seatIds } = req.body;
+    const { show_id, seat_ids } = req.body;
 
-    if (!showId || !seatIds) {
+    if (!show_id || !seat_ids) {
       return res.status(400).json({
         success: false,
-        error: "showId and seatIds are required",
+        error: "show_id and seat_ids are required",
       });
     }
 
-    const booking = await BookingService.bookSeats(userId, showId, seatIds);
+    const booking = await BookingService.bookSeats(userId, show_id, seat_ids);
     res.status(201).json({ success: true, data: booking });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });

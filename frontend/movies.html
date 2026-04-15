@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movies - Book My Show</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="container navbar-container">
+            <div class="navbar-brand">
+                <h1><a href="index.html" style="text-decoration: none; color: inherit;">🎬 Book My Show</a></h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="movies.html">Movies</a></li>
+                <li id="navProfile" style="display: none;"><a href="profile.html">Profile</a></li>
+                <li id="navAdmin" style="display: none;"><a href="admin.html">Admin</a></li>
+                <li id="navLogout" style="display: none;"><a href="#" onclick="logout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container page-section">
+        <div class="page-header">
+            <h2>Movies & Shows</h2>
+            <p>Select a movie and show to book your seats</p>
+        </div>
+
+        <!-- Movies Section -->
+        <section class="section">
+            <h3>Available Movies</h3>
+            <div id="moviesContainer" class="movies-grid">
+                <p class="loading">Loading movies...</p>
+            </div>
+        </section>
+
+        <!-- Shows Section -->
+        <section class="section" id="showsSection" style="display: none;">
+            <h3>Shows for <span id="selectedMovieName"></span></h3>
+            <div id="showsContainer" class="shows-grid">
+                <p class="loading">Loading shows...</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2024 Book My Show. All rights reserved.</p>
+    </footer>
+
+    <script src="assets/api.js"></script>
+    <script src="assets/auth.js"></script>
+    <script>
+        let selectedMovieId = null;
+
+        window.addEventListener('load', () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = 'index.html';
+                return;
+            }
+            updateNavbar();
+            loadMovies();
+        });
+
+        async function loadMovies() {
+            try {
+                const movies = await api.getMovies();
+                console.log('Movies loaded:', movies);
+                const container = document.getElementById('moviesContainer');
+
+                if (movies.length === 0) {
+                    container.innerHTML = '<p>No movies available at the moment.</p>';
+                    return;
+                }
+
+                container.innerHTML = movies.map(movie => `
+                    <div class="movie-card">
+                        <div class="movie-poster">
+                            <img src="${movie.poster_url || `https://via.placeholder.com/220x280?text=${encodeURIComponent(movie.title)}`}" alt="${movie.title}" onerror="this.src='https://via.placeholder.com/220x280?text=${encodeURIComponent(movie.title)}'">
+                        </div>
+                        <div class="movie-info">
+                            <h4>${movie.title}</h4>
+                            <p class="genre">${movie.genre || 'N/A'}</p>
+                            <p class="duration">⏱️ ${movie.duration || 0} mins</p>
+                            <p class="rating">⭐ ${movie.rating || 0}/10</p>
+                            <p class="description">${movie.description || 'No description available'}</p>
+                            <button class="btn btn-primary btn-block" onclick="loadShows(${movie.id}, '${movie.title.replace(/'/g, "\\'")}')" style="margin-top: auto;">View Shows</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('moviesContainer').innerHTML = `<p class="error">Error loading movies: ${error.message}</p>`;
+            }
+        }
+
+        async function loadShows(movieId, movieTitle) {
+            try {
+                selectedMovieId = movieId;
+                document.getElementById('selectedMovieName').textContent = movieTitle;
+                document.getElementById('moviesContainer').style.display = 'none';
+                document.getElementById('showsSection').style.display = 'block';
+
+                const shows = await api.getShows();
+                const filteredShows = shows.filter(show => show.movie_id === movieId);
+                const container = document.getElementById('showsContainer');
+
+                if (filteredShows.length === 0) {
+                    container.innerHTML = '<p>No shows available for this movie.</p>';
+                    return;
+                }
+
+                container.innerHTML = filteredShows.map(show => `
+                    <div class="show-card">
+                        <div class="show-info">
+                            <h4>Show Time</h4>
+                            <p class="time">🕐 ${formatTime(show.show_time)}</p>
+                            <p class="date">📅 ${formatDate(show.show_date)}</p>
+                            <p class="theatre">🏢 ${show.theatre_name}</p>
+                            <p class="price">💰 ₹${show.ticket_price}</p>
+                            <p class="seats">Available Seats: <strong>${show.total_seats - (show.booked_seats || 0)}</strong></p>
+                            <button class="btn btn-primary" onclick="goToBooking(${show.id})">Book Now</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('showsContainer').innerHTML = `<p class="error">Error loading shows: ${error.message}</p>`;
+            }
+        }
+
+        function goToBooking(showId) {
+            window.location.href = `booking.html?showId=${showId}`;
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', {
+                weekday: 'short',
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        function formatTime(timeString) {
+            const [hours, minutes] = timeString.split(':');
+            const hour = parseInt(hours);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour % 12 || 12;
+            return `${displayHour}:${minutes} ${ampm}`;
+        }
+    </script>
+</body>
+
+</html>

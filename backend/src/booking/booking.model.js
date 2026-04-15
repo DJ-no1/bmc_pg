@@ -29,8 +29,9 @@ export const getShows = async () => {
 
 export const getShowById = async (id) => {
   const query = `
-    SELECT s.id, s.movie_id, m.title as movieTitle,
-           s.show_time, s.screen_number, s.available_seats
+    SELECT s.id, s.movie_id, m.title as movieTitle, m.base_price as ticket_price,
+           s.show_time, s.show_time::DATE as show_date, s.screen_number, s.available_seats,
+           'PVR Cinemas' as theatre_name
     FROM shows s
     JOIN movies m ON s.movie_id = m.id
     WHERE s.id = $1`;
@@ -38,9 +39,9 @@ export const getShowById = async (id) => {
   return result.rows[0];
 };
 
-export const updateAvailableSeats = async (showId, newCount) => {
+export const updateAvailableSeats = async (conn, showId, newCount) => {
   const query = "UPDATE shows SET available_seats = $1 WHERE id = $2";
-  await pool.query(query, [newCount, showId]);
+  await conn.query(query, [newCount, showId]);
 };
 
 // ===== SEATS =====
@@ -52,14 +53,14 @@ export const getSeatsByShowId = async (showId) => {
   return result.rows;
 };
 
-export const getMultipleSeats = async (seatIds) => {
+export const getMultipleSeats = async (conn, seatIds) => {
   if (!seatIds.length) return [];
   const placeholders = seatIds.map((_, i) => `$${i + 1}`).join(",");
   const query = `
     SELECT id, show_id, row_letter, seat_number, isbooked, seat_type, price_multiplier
     FROM seats WHERE id IN (${placeholders})
     FOR UPDATE`;
-  const result = await pool.query(query, seatIds);
+  const result = await conn.query(query, seatIds);
   return result.rows;
 };
 
@@ -73,12 +74,12 @@ export const bookSeat = async (conn, seatId) => {
 };
 
 // ===== BOOKINGS =====
-export const createBooking = async (userId, seatId, showId, totalPrice) => {
+export const createBooking = async (conn, userId, seatId, showId, totalPrice) => {
   const query = `
     INSERT INTO bookings (user_id, seat_id, show_id, total_price, status)
     VALUES ($1, $2, $3, $4, 'confirmed')
     RETURNING id, user_id, seat_id, show_id, total_price, status, booking_time`;
-  const result = await pool.query(query, [userId, seatId, showId, totalPrice]);
+  const result = await conn.query(query, [userId, seatId, showId, totalPrice]);
   return result.rows[0];
 };
 
@@ -102,11 +103,11 @@ export const getBookingById = async (bookingId) => {
   return result.rows[0];
 };
 
-export const cancelBookingDb = async (bookingId) => {
+export const cancelBookingDb = async (conn, bookingId) => {
   const query = `
     UPDATE bookings SET status = 'cancelled', cancellation_time = CURRENT_TIMESTAMP
     WHERE id = $1 RETURNING *`;
-  const result = await pool.query(query, [bookingId]);
+  const result = await conn.query(query, [bookingId]);
   return result.rows[0];
 };
 

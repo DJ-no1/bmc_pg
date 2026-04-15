@@ -81,6 +81,17 @@ class UserModel {
         const result = await pool.query(query, [userId]);
         return result.rows[0];
     }
+
+    static async verifyUserEmail(userId) {
+        const query = `
+      UPDATE users
+      SET is_verified = TRUE, verification_token = NULL, verification_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING id, email, name, role, is_verified;
+    `;
+        const result = await pool.query(query, [userId]);
+        return result.rows[0];
+    }
 }
 
 export default UserModel;

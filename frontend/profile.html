@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile - Book My Show</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="container navbar-container">
+            <div class="navbar-brand">
+                <h1><a href="index.html" style="text-decoration: none; color: inherit;">🎬 Book My Show</a></h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="movies.html">Movies</a></li>
+                <li id="navProfile"><a href="profile.html">Profile</a></li>
+                <li id="navAdmin" style="display: none;"><a href="admin.html">Admin</a></li>
+                <li id="navLogout"><a href="#" onclick="logout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container page-section">
+        <div class="page-header">
+            <h2>My Profile</h2>
+        </div>
+
+        <div class="profile-container">
+            <!-- Profile Info Section -->
+            <section class="profile-section">
+                <h3>Account Information</h3>
+                <div class="profile-info">
+                    <div class="info-item">
+                        <label>Name:</label>
+                        <p id="userName">-</p>
+                    </div>
+                    <div class="info-item">
+                        <label>Email:</label>
+                        <p id="userEmail">-</p>
+                    </div>
+                    <div class="info-item">
+                        <label>Phone:</label>
+                        <p id="userPhone">-</p>
+                    </div>
+                    <div class="info-item">
+                        <label>Member Since:</label>
+                        <p id="userCreated">-</p>
+                    </div>
+                </div>
+
+                <div class="profile-actions">
+                    <button class="btn btn-secondary" onclick="togglePasswordForm()">Change Password</button>
+                </div>
+            </section>
+
+            <!-- Change Password Section -->
+            <section id="passwordSection" class="profile-section" style="display: none;">
+                <h3>Change Password</h3>
+                <form id="passwordForm" class="form">
+                    <div class="form-group">
+                        <label for="oldPassword">Current Password:</label>
+                        <input type="password" id="oldPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newPassword">New Password:</label>
+                        <input type="password" id="newPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password:</label>
+                        <input type="password" id="confirmPassword" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Update Password</button>
+                        <button type="button" class="btn btn-secondary" onclick="togglePasswordForm()">Cancel</button>
+                    </div>
+                    <p id="passwordError" class="error-message"></p>
+                </form>
+            </section>
+
+            <!-- My Bookings Section -->
+            <section class="profile-section">
+                <h3>My Bookings</h3>
+                <div id="bookingsContainer" class="bookings-list">
+                    <p class="loading">Loading bookings...</p>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2024 Book My Show. All rights reserved.</p>
+    </footer>
+
+    <script src="assets/api.js"></script>
+    <script src="assets/auth.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = 'index.html';
+                return;
+            }
+            updateNavbar();
+            loadProfile();
+            loadBookings();
+        });
+
+        async function loadProfile() {
+            try {
+                const profile = await api.getProfile();
+                document.getElementById('userName').textContent = profile.name;
+                document.getElementById('userEmail').textContent = profile.email;
+                document.getElementById('userPhone').textContent = profile.phone;
+                document.getElementById('userCreated').textContent = new Date(profile.created_at).toLocaleDateString();
+            } catch (error) {
+                console.error('Error loading profile:', error);
+            }
+        }
+
+        async function loadBookings() {
+            try {
+                const bookings = await api.getMyBookings();
+                const container = document.getElementById('bookingsContainer');
+
+                if (bookings.length === 0) {
+                    container.innerHTML = '<p>No bookings yet. <a href="movies.html">Book a movie now!</a></p>';
+                    return;
+                }
+
+                container.innerHTML = bookings.map(booking => `
+                    <div class="booking-card">
+                        <div class="booking-header">
+                            <h4>${booking.movie_title}</h4>
+                            <span class="status ${booking.status}">${booking.status.toUpperCase()}</span>
+                        </div>
+                        <div class="booking-details">
+                            <p><strong>Booking ID:</strong> ${booking.id}</p>
+                            <p><strong>Theatre:</strong> ${booking.theatre_name}</p>
+                            <p><strong>Show Date:</strong> ${new Date(booking.show_date).toLocaleDateString()}</p>
+                            <p><strong>Show Time:</strong> ${booking.show_time}</p>
+                            <p><strong>Seats:</strong> ${booking.seats_booked}</p>
+                            <p><strong>Total Amount:</strong> ₹${booking.total_amount}</p>
+                            <p><strong>Booked On:</strong> ${new Date(booking.booking_date).toLocaleDateString()}</p>
+                        </div>
+                        ${booking.status === 'active' ? `
+                            <button class="btn btn-danger" onclick="cancelBooking(${booking.id})">Cancel Booking</button>
+                        ` : ''}
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('bookingsContainer').innerHTML =
+                    `<p class="error">Error loading bookings: ${error.message}</p>`;
+            }
+        }
+
+        function togglePasswordForm() {
+            const section = document.getElementById('passwordSection');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const errorEl = document.getElementById('passwordError');
+
+            if (newPassword !== confirmPassword) {
+                errorEl.textContent = 'Passwords do not match';
+                return;
+            }
+
+            try {
+                await api.changePassword(oldPassword, newPassword);
+                alert('Password changed successfully!');
+                togglePasswordForm();
+                document.getElementById('passwordForm').reset();
+            } catch (error) {
+                errorEl.textContent = error.message;
+            }
+        });
+
+        async function cancelBooking(bookingId) {
+            if (!confirm('Are you sure you want to cancel this booking?')) return;
+
+            try {
+                await api.cancelBooking(bookingId);
+                alert('Booking cancelled successfully!');
+                loadBookings();
+            } catch (error) {
+                alert('Error cancelling booking: ' + error.message);
+            }
+        }
+    </script>
+</body>
+
+</html>

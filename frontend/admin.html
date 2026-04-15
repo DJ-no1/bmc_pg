@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Book My Show</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="container navbar-container">
+            <div class="navbar-brand">
+                <h1><a href="index.html" style="text-decoration: none; color: inherit;">🎬 Book My Show</a></h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="movies.html">Movies</a></li>
+                <li id="navProfile"><a href="profile.html">Profile</a></li>
+                <li id="navAdmin"><a href="admin.html">Admin</a></li>
+                <li id="navLogout"><a href="#" onclick="logout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container page-section">
+        <div class="page-header">
+            <h2>Admin Panel</h2>
+            <p>Manage movies and shows</p>
+        </div>
+
+        <!-- Admin Tabs -->
+        <div class="admin-tabs">
+            <button class="tab-btn active" onclick="switchAdminTab('movies')">Manage Movies</button>
+            <button class="tab-btn" onclick="switchAdminTab('shows')">Manage Shows</button>
+        </div>
+
+        <!-- Movies Management Section -->
+        <section id="moviesTab" class="admin-section" style="display: block;">
+            <h3>All Movies</h3>
+
+            <div class="admin-actions">
+                <button class="btn btn-primary" onclick="toggleAddMovieForm()">+ Add New Movie</button>
+            </div>
+
+            <!-- Add Movie Form -->
+            <form id="addMovieForm" class="admin-form" style="display: none;">
+                <h4>Add New Movie</h4>
+                <div class="form-group">
+                    <label for="movieTitle">Title:</label>
+                    <input type="text" id="movieTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="movieGenre">Genre:</label>
+                    <input type="text" id="movieGenre" required>
+                </div>
+                <div class="form-group">
+                    <label for="movieDuration">Duration (mins):</label>
+                    <input type="number" id="movieDuration" required>
+                </div>
+                <div class="form-group">
+                    <label for="movieRating">Rating (1-10):</label>
+                    <input type="number" id="movieRating" min="1" max="10" required>
+                </div>
+                <div class="form-group">
+                    <label for="movieDescription">Description:</label>
+                    <textarea id="movieDescription" required></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Add Movie</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleAddMovieForm()">Cancel</button>
+                </div>
+                <p id="movieError" class="error-message"></p>
+            </form>
+
+            <!-- Movies List -->
+            <div id="moviesListContainer" class="items-list">
+                <p class="loading">Loading movies...</p>
+            </div>
+        </section>
+
+        <!-- Shows Management Section -->
+        <section id="showsTab" class="admin-section" style="display: none;">
+            <h3>All Shows</h3>
+
+            <div class="admin-actions">
+                <button class="btn btn-primary" onclick="toggleAddShowForm()">+ Add New Show</button>
+            </div>
+
+            <!-- Add Show Form -->
+            <form id="addShowForm" class="admin-form" style="display: none;">
+                <h4>Add New Show</h4>
+                <div class="form-group">
+                    <label for="showMovieId">Movie:</label>
+                    <select id="showMovieId" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="showDate">Show Date:</label>
+                    <input type="date" id="showDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="showTime">Show Time:</label>
+                    <input type="time" id="showTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="theatreName">Theatre Name:</label>
+                    <input type="text" id="theatreName" required>
+                </div>
+                <div class="form-group">
+                    <label for="ticketPrice">Ticket Price (₹):</label>
+                    <input type="number" id="ticketPrice" required>
+                </div>
+                <div class="form-group">
+                    <label for="totalSeats">Total Seats:</label>
+                    <input type="number" id="totalSeats" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Add Show</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleAddShowForm()">Cancel</button>
+                </div>
+                <p id="showError" class="error-message"></p>
+            </form>
+
+            <!-- Shows List -->
+            <div id="showsListContainer" class="items-list">
+                <p class="loading">Loading shows...</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2024 Book My Show. All rights reserved.</p>
+    </footer>
+
+    <script src="assets/api.js"></script>
+    <script src="assets/auth.js"></script>
+    <script>
+        window.addEventListener('load', () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = 'index.html';
+                return;
+            }
+            updateNavbar();
+            checkAdminAccess();
+            loadAdminMovies();
+            loadAdminShows();
+            loadMovieOptions();
+        });
+
+        async function checkAdminAccess() {
+            try {
+                const profile = await api.getProfile();
+                if (!profile.is_admin) {
+                    alert('You do not have admin access');
+                    window.location.href = 'index.html';
+                }
+            } catch (error) {
+                window.location.href = 'index.html';
+            }
+        }
+
+        function switchAdminTab(tab) {
+            document.getElementById('moviesTab').style.display = tab === 'movies' ? 'block' : 'none';
+            document.getElementById('showsTab').style.display = tab === 'shows' ? 'block' : 'none';
+
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        // Movies Management
+        async function loadAdminMovies() {
+            try {
+                const movies = await api.getMovies();
+                const container = document.getElementById('moviesListContainer');
+
+                if (movies.length === 0) {
+                    container.innerHTML = '<p>No movies available.</p>';
+                    return;
+                }
+
+                container.innerHTML = movies.map(movie => `
+                    <div class="admin-item">
+                        <div class="item-info">
+                            <h4>${movie.title}</h4>
+                            <p>${movie.genre} • ${movie.duration} mins • ⭐ ${movie.rating}/10</p>
+                            <p class="description">${movie.description}</p>
+                        </div>
+                        <div class="item-actions">
+                            <button class="btn btn-small" onclick="editMovie(${movie.id})">Edit</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteMovie(${movie.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('moviesListContainer').innerHTML =
+                    `<p class="error">Error loading movies: ${error.message}</p>`;
+            }
+        }
+
+        function toggleAddMovieForm() {
+            const form = document.getElementById('addMovieForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+
+        document.getElementById('addMovieForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                await api.createMovie({
+                    title: document.getElementById('movieTitle').value,
+                    genre: document.getElementById('movieGenre').value,
+                    duration: parseInt(document.getElementById('movieDuration').value),
+                    rating: parseFloat(document.getElementById('movieRating').value),
+                    description: document.getElementById('movieDescription').value
+                });
+                alert('Movie added successfully!');
+                toggleAddMovieForm();
+                document.getElementById('addMovieForm').reset();
+                loadAdminMovies();
+                loadMovieOptions();
+            } catch (error) {
+                document.getElementById('movieError').textContent = error.message;
+            }
+        });
+
+        async function deleteMovie(movieId) {
+            if (!confirm('Are you sure you want to delete this movie?')) return;
+            try {
+                await api.deleteMovie(movieId);
+                alert('Movie deleted successfully!');
+                loadAdminMovies();
+                loadMovieOptions();
+            } catch (error) {
+                alert('Error deleting movie: ' + error.message);
+            }
+        }
+
+        // Shows Management
+        async function loadAdminShows() {
+            try {
+                const shows = await api.getShows();
+                const container = document.getElementById('showsListContainer');
+
+                if (shows.length === 0) {
+                    container.innerHTML = '<p>No shows available.</p>';
+                    return;
+                }
+
+                container.innerHTML = shows.map(show => `
+                    <div class="admin-item">
+                        <div class="item-info">
+                            <h4>${show.theatre_name}</h4>
+                            <p>Movie: ${show.movie_id} • Date: ${new Date(show.show_date).toLocaleDateString()} at ${show.show_time}</p>
+                            <p>Price: ₹${show.ticket_price} • Total Seats: ${show.total_seats}</p>
+                        </div>
+                        <div class="item-actions">
+                            <button class="btn btn-small" onclick="editShow(${show.id})">Edit</button>
+                            <button class="btn btn-danger btn-small" onclick="deleteShow(${show.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('showsListContainer').innerHTML =
+                    `<p class="error">Error loading shows: ${error.message}</p>`;
+            }
+        }
+
+        async function loadMovieOptions() {
+            try {
+                const movies = await api.getMovies();
+                const select = document.getElementById('showMovieId');
+                select.innerHTML = movies.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
+            } catch (error) {
+                console.error('Error loading movies:', error);
+            }
+        }
+
+        function toggleAddShowForm() {
+            const form = document.getElementById('addShowForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+
+        document.getElementById('addShowForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                await api.createShow({
+                    movie_id: parseInt(document.getElementById('showMovieId').value),
+                    show_date: document.getElementById('showDate').value,
+                    show_time: document.getElementById('showTime').value,
+                    theatre_name: document.getElementById('theatreName').value,
+                    ticket_price: parseInt(document.getElementById('ticketPrice').value),
+                    total_seats: parseInt(document.getElementById('totalSeats').value)
+                });
+                alert('Show added successfully!');
+                toggleAddShowForm();
+                document.getElementById('addShowForm').reset();
+                loadAdminShows();
+            } catch (error) {
+                document.getElementById('showError').textContent = error.message;
+            }
+        });
+
+        async function deleteShow(showId) {
+            if (!confirm('Are you sure you want to delete this show?')) return;
+            try {
+                await api.deleteShow(showId);
+                alert('Show deleted successfully!');
+                loadAdminShows();
+            } catch (error) {
+                alert('Error deleting show: ' + error.message);
+            }
+        }
+
+        function editMovie(id) {
+            alert('Edit functionality coming soon');
+        }
+
+        function editShow(id) {
+            alert('Edit functionality coming soon');
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Seats - Book My Show</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="container navbar-container">
+            <div class="navbar-brand">
+                <h1><a href="index.html" style="text-decoration: none; color: inherit;">🎬 Book My Show</a></h1>
+            </div>
+            <ul class="nav-links">
+                <li><a href="movies.html">Movies</a></li>
+                <li id="navProfile" style="display: none;"><a href="profile.html">Profile</a></li>
+                <li id="navAdmin" style="display: none;"><a href="admin.html">Admin</a></li>
+                <li id="navLogout" style="display: none;"><a href="#" onclick="logout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container page-section">
+        <div class="page-header">
+            <h2>Select Your Seats</h2>
+            <a href="movies.html" class="btn btn-secondary">← Back to Movies</a>
+        </div>
+
+        <div class="booking-container">
+            <section class="seating-section">
+                <div class="screen">SCREEN</div>
+                <div id="seatsContainer" class="seats-grid">
+                    <p class="loading">Loading seats...</p>
+                </div>
+            </section>
+
+            <aside class="booking-summary">
+                <h3>Booking Summary</h3>
+                <div class="summary-item">
+                    <label>Show Details:</label>
+                    <p id="showDetails">-</p>
+                </div>
+                <div class="summary-item">
+                    <label>Selected Seats:</label>
+                    <p id="selectedSeats">None</p>
+                </div>
+                <div class="summary-item">
+                    <label>Seat Price:</label>
+                    <p id="seatPrice">₹0</p>
+                </div>
+                <div class="summary-item">
+                    <label>Total Seats:</label>
+                    <p id="totalSeats">0</p>
+                </div>
+                <div class="summary-item total">
+                    <label>Total Amount:</label>
+                    <p id="totalAmount">₹0</p>
+                </div>
+                <button id="bookBtn" class="btn btn-primary btn-block" onclick="confirmBooking()">Confirm
+                    Booking</button>
+                <p id="bookingError" class="error-message"></p>
+            </aside>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <p>&copy; 2024 Book My Show. All rights reserved.</p>
+    </footer>
+
+    <script src="assets/api.js"></script>
+    <script src="assets/auth.js"></script>
+    <script>
+        let selectedSeats = [];
+        let showData = null;
+        let seatsData = null;
+
+        window.addEventListener('load', () => {
+            if (!api.isAuthenticated()) {
+                window.location.href = 'index.html';
+                return;
+            }
+            updateNavbar();
+            loadBookingData();
+        });
+
+        async function loadBookingData() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const showId = params.get('showId');
+
+                if (!showId) {
+                    throw new Error('No show ID provided');
+                }
+
+                showData = await api.getShowById(showId);
+                seatsData = await api.getSeatsForShow(showId);
+
+                document.getElementById('showDetails').textContent =
+                    `${showData.theatre_name} - ${new Date(showData.show_date).toLocaleDateString()} at ${showData.show_time}`;
+                document.getElementById('seatPrice').textContent = `₹${showData.ticket_price}`;
+
+                renderSeats();
+            } catch (error) {
+                document.getElementById('seatsContainer').innerHTML =
+                    `<p class="error">Error loading booking data: ${error.message}</p>`;
+            }
+        }
+
+        function renderSeats() {
+            const container = document.getElementById('seatsContainer');
+            const rows = {};
+
+            // Group seats by row
+            seatsData.forEach(seat => {
+                if (!rows[seat.row]) rows[seat.row] = [];
+                rows[seat.row].push(seat);
+            });
+
+            let html = '';
+            Object.keys(rows).sort().forEach(row => {
+                html += `<div class="seat-row">`;
+                html += `<span class="row-label">${row}</span>`;
+
+                rows[row].sort((a, b) => a.seat_number - b.seat_number).forEach(seat => {
+                    const isBooked = seat.is_booked;
+                    const isSelected = selectedSeats.find(s => s.id === seat.id);
+                    const seatClass = `seat ${isBooked ? 'booked' : ''} ${isSelected ? 'selected' : ''}`;
+
+                    html += `<button class="${seatClass}" 
+                        onclick="toggleSeat(${seat.id}, ${seat.is_booked}, this)"
+                        title="Row ${seat.row} - Seat ${seat.seat_number}"
+                        ${isBooked ? 'disabled' : ''}>
+                        ${seat.seat_number}
+                    </button>`;
+                });
+
+                html += `<span class="row-label">${row}</span>`;
+                html += `</div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function toggleSeat(seatId, isBooked, element) {
+            if (isBooked) return;
+
+            const seat = seatsData.find(s => s.id === seatId);
+            const index = selectedSeats.findIndex(s => s.id === seatId);
+
+            if (index === -1) {
+                selectedSeats.push(seat);
+                element.classList.add('selected');
+            } else {
+                selectedSeats.splice(index, 1);
+                element.classList.remove('selected');
+            }
+
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const seatsText = selectedSeats.length === 0
+                ? 'None'
+                : selectedSeats.map(s => `${s.row}${s.seat_number}`).join(', ');
+
+            document.getElementById('selectedSeats').textContent = seatsText;
+            document.getElementById('totalSeats').textContent = selectedSeats.length;
+
+            const total = selectedSeats.length * showData.ticket_price;
+            document.getElementById('totalAmount').textContent = `₹${total}`;
+
+            document.getElementById('bookBtn').disabled = selectedSeats.length === 0;
+        }
+
+        async function confirmBooking() {
+            if (selectedSeats.length === 0) {
+                alert('Please select at least one seat');
+                return;
+            }
+
+            try {
+                document.getElementById('bookBtn').disabled = true;
+                const response = await api.bookSeats(showData.id, selectedSeats.map(s => s.id));
+                alert('Booking successful! Your booking ID: ' + response.booking_id);
+                window.location.href = 'profile.html';
+            } catch (error) {
+                document.getElementById('bookingError').textContent = error.message;
+                document.getElementById('bookBtn').disabled = false;
+            }
+        }
+    </script>
+</body>
+
+</html>

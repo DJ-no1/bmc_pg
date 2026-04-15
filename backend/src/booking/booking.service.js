@@ -13,23 +13,14 @@ export const getSeatsForShow = async (showId) => {
   if (!show) throw new Error("Show not found");
 
   const seats = await BookingModel.getSeatsByShowId(showId);
-  return {
-    show: {
-      id: show.id,
-      movieTitle: show.movieTitle,
-      showTime: show.show_time,
-      screenNumber: show.screen_number,
-      availableSeats: show.available_seats,
-    },
-    seats: seats.map(s => ({
-      id: s.id,
-      row: s.row_letter,
-      seatNumber: s.seat_number,
-      isBooked: s.isbooked,
-      seatType: s.seat_type,
-      priceMultiplier: s.price_multiplier,
-    })),
-  };
+  return seats.map(s => ({
+    id: s.id,
+    row: s.row_letter,
+    seat_number: s.seat_number,
+    is_booked: s.isbooked,
+    seat_type: s.seat_type,
+    price_multiplier: s.price_multiplier,
+  }));
 };
 
 // ===== BOOKING WITH TRANSACTION =====
@@ -51,7 +42,7 @@ export const bookSeats = async (userId, showId, seatIds) => {
     await conn.query("BEGIN");
 
     // Lock and verify seats
-    const seatsData = await BookingModel.getMultipleSeats(uniqueSeatIds);
+    const seatsData = await BookingModel.getMultipleSeats(conn, uniqueSeatIds);
 
     if (seatsData.length !== uniqueSeatIds.length) {
       throw new Error("One or more seats not found");
@@ -82,13 +73,13 @@ export const bookSeats = async (userId, showId, seatIds) => {
       const seatPrice = basePrice * seat.price_multiplier;
 
       // Create booking record for this seat
-      const booking = await BookingModel.createBooking(userId, seatId, showId, seatPrice);
+      const booking = await BookingModel.createBooking(conn, userId, seatId, showId, seatPrice);
       bookings.push(booking);
     }
 
     // Update available seats
     const newAvailableSeats = show.available_seats - uniqueSeatIds.length;
-    await BookingModel.updateAvailableSeats(showId, newAvailableSeats);
+    await BookingModel.updateAvailableSeats(conn, showId, newAvailableSeats);
 
     await conn.query("COMMIT");
 
@@ -144,13 +135,13 @@ export const cancelBooking = async (userId, bookingId) => {
     await conn.query("BEGIN");
 
     // Cancel booking and release seat in one call
-    await BookingModel.cancelBookingDb(bookingId);
+    await BookingModel.cancelBookingDb(conn, bookingId);
     await BookingModel.releaseSeat(conn, booking.seat_id);
 
     // Update available seats
     const show = await BookingModel.getShowById(booking.show_id);
     const newAvailableSeats = show.available_seats + 1;
-    await BookingModel.updateAvailableSeats(booking.show_id, newAvailableSeats);
+    await BookingModel.updateAvailableSeats(conn, booking.show_id, newAvailableSeats);
 
     await conn.query("COMMIT");
 

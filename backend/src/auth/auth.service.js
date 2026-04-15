@@ -28,6 +28,12 @@ class AuthService {
 
         const user = await UserModel.createUser(email, passwordHash, name);
 
+        // In development mode, auto-verify email for easier testing
+        const isDevelopment = process.env.NODE_ENV !== 'production';
+        if (isDevelopment) {
+            await UserModel.verifyUserEmail(user.id);
+        }
+
         // Generate verification token (valid for 24 hours)
         const verificationToken = crypto.randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -74,8 +80,9 @@ class AuthService {
             throw new Error("Invalid email or password");
         }
 
-        // Check if email is verified
-        if (!user.is_verified) {
+        // Check if email is verified (skip in development mode)
+        const isDevelopment = process.env.NODE_ENV !== 'production';
+        if (!user.is_verified && !isDevelopment) {
             // Resend verification email if expired
             const verificationToken = crypto.randomBytes(32).toString("hex");
             const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
