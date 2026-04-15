@@ -435,11 +435,11 @@
             try {
                 const show = await api.getShowById(id);
                 const movies = await api.getMovies();
-                
+
                 // Populate options
                 const select = document.getElementById('editShowMovieId');
                 select.innerHTML = movies.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
-                
+
                 document.getElementById('editShowId').value = show.id;
                 document.getElementById('editShowMovieId').value = show.movie_id;
                 // HTML date fields expect YYYY-MM-DD
@@ -450,7 +450,7 @@
                 document.getElementById('editTheatreName').value = show.theatre_name;
                 document.getElementById('editTicketPrice').value = show.ticket_price;
                 document.getElementById('editTotalSeats').value = show.total_seats;
-                
+
                 document.getElementById('editShowForm').style.display = 'block';
                 document.getElementById('addShowForm').style.display = 'none';
                 window.scrollTo(0, 0);
@@ -478,6 +478,7 @@
                 document.getElementById('editShowError').textContent = error.message;
             }
         });
-        </script>
+    </script>
 </body>
+
 </html>
