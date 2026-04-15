@@ -1,6 +1,4 @@
 import express from "express";
-import { dirname } from "path";
-import { fileURLToPath } from "url";
 import cors from "cors";
 import dotenv from "dotenv";
 
@@ -8,15 +6,13 @@ import authRoutes from "./src/auth/auth.routes.js";
 import bookingRoutes from "./src/booking/booking.routes.js";
 import adminRoutes from "./src/admin/admin.js";
 
-import { authenticateToken } from "./src/auth/auth.middleware.js";
+// Load environment variables without verbose logging
+dotenv.config({ debug: false });
 
-dotenv.config();
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const port = process.env.PORT || 8080;
-
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -101,12 +97,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(port, () => {
-  console.log("╔════════════════════════════════════════╗");
-  console.log("║   🎬 Book My Ticket API Server         ║");
-  console.log("╚════════════════════════════════════════╝");
-  console.log(`Server running on port: ${port}`);
-  console.log(`API Base URL: http://localhost:${port}/api`);
-  console.log(`Health Check: http://localhost:${port}/api/health`);
-  console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log("════════════════════════════════════════");
+  console.log(`🎬 Book My Ticket API Server - Running on port ${port}`);
+  console.log(`📍 API: http://localhost:${port}/api`);
+  console.log(`💚 Health: http://localhost:${port}/api/health`);
 });

@@ -17,15 +17,17 @@ export const getSeatsForShow = async (showId) => {
     show: {
       id: show.id,
       movieTitle: show.movieTitle,
-      showDate: show.show_date,
       showTime: show.show_time,
-      price: show.price,
+      screenNumber: show.screen_number,
       availableSeats: show.available_seats,
     },
     seats: seats.map(s => ({
       id: s.id,
+      row: s.row_letter,
       seatNumber: s.seat_number,
-      isBooked: s.is_booked,
+      isBooked: s.isbooked,
+      seatType: s.seat_type,
+      priceMultiplier: s.price_multiplier,
     })),
   };
 };
@@ -60,25 +62,29 @@ export const bookSeats = async (userId, showId, seatIds) => {
       throw new Error("All seats must be from the same show");
     }
 
-    const bookedSeats = seatsData.filter(s => s.is_booked);
+    const bookedSeats = seatsData.filter(s => s.isbooked);
     if (bookedSeats.length > 0) {
-      const bookedNumbers = bookedSeats.map(s => s.seat_number).join(", ");
-      throw new Error(`Seats already booked: ${bookedNumbers}`);
+      const bookedSeatInfo = bookedSeats.map(s => `${s.row_letter}${s.seat_number}`).join(", ");
+      throw new Error(`Seats already booked: ${bookedSeatInfo}`);
     }
 
-    // Book each seat
-    const bookedSeatsResult = [];
-    for (const seatId of uniqueSeatIds) {
-      const result = await BookingModel.bookSeat(conn, seatId, userId);
-      if (!result) throw new Error(`Failed to book seat ${seatId}`);
-      bookedSeatsResult.push(result);
-    }
+    // Book each seat and create individual bookings
+    const bookings = [];
+    for (let i = 0; i < uniqueSeatIds.length; i++) {
+      const seatId = uniqueSeatIds[i];
+      const seat = seatsData[i];
 
-    // Create booking record
-    const totalPrice = show.price * uniqueSeatIds.length;
-    const booking = await BookingModel.createBooking(
-      userId, showId, uniqueSeatIds, totalPrice
-    );
+      // Book the seat
+      await BookingModel.bookSeat(conn, seatId);
+
+      // Calculate price based on base price and multiplier
+      const basePrice = 480; // Default from schema, could fetch from movie
+      const seatPrice = basePrice * seat.price_multiplier;
+
+      // Create booking record for this seat
+      const booking = await BookingModel.createBooking(userId, seatId, showId, seatPrice);
+      bookings.push(booking);
+    }
 
     // Update available seats
     const newAvailableSeats = show.available_seats - uniqueSeatIds.length;
@@ -87,13 +93,16 @@ export const bookSeats = async (userId, showId, seatIds) => {
     await conn.query("COMMIT");
 
     return {
-      bookingId: booking.id,
-      userId: booking.user_id,
-      showId: booking.show_id,
-      bookedSeats: bookedSeatsResult.map(s => s.seat_number),
-      totalPrice: booking.total_price,
-      bookingStatus: booking.booking_status,
-      createdAt: booking.created_at,
+      bookings: bookings.map(b => ({
+        bookingId: b.id,
+        seatId: b.seat_id,
+        userId: b.user_id,
+        showId: b.show_id,
+        totalPrice: b.total_price,
+        status: b.status,
+        bookingTime: b.booking_time,
+      })),
+      totalAmount: bookings.reduce((sum, b) => sum + parseFloat(b.total_price), 0),
     };
   } catch (error) {
     await conn.query("ROLLBACK");
@@ -109,11 +118,12 @@ export const getUserBookings = async (userId) => {
   return bookings.map(b => ({
     bookingId: b.id,
     movieTitle: b.title,
-    showDate: b.show_date,
     showTime: b.show_time,
-    bookedSeats: b.seat_ids,
+    screenNumber: b.screen_number,
+    seatInfo: `${b.row_letter}${b.seat_number}`,
     totalPrice: b.total_price,
-    bookingStatus: b.booking_status,
+    status: b.status,
+    bookingTime: b.booking_time,
   }));
 };
 
@@ -125,7 +135,7 @@ export const cancelBooking = async (userId, bookingId) => {
   if (booking.user_id !== userId) {
     throw new Error("Unauthorized to cancel this booking");
   }
-  if (booking.booking_status === "cancelled") {
+  if (booking.status === "cancelled") {
     throw new Error("Booking is already cancelled");
   }
 
@@ -133,18 +143,13 @@ export const cancelBooking = async (userId, bookingId) => {
   try {
     await conn.query("BEGIN");
 
-    // Cancel booking
+    // Cancel booking and release seat in one call
     await BookingModel.cancelBookingDb(bookingId);
-
-    // Release seats
-    const releaseQuery = `
-      UPDATE seats SET is_booked = FALSE, booked_by = NULL
-      WHERE id = ANY($1)`;
-    await conn.query(releaseQuery, [booking.seat_ids]);
+    await BookingModel.releaseSeat(conn, booking.seat_id);
 
     // Update available seats
     const show = await BookingModel.getShowById(booking.show_id);
-    const newAvailableSeats = show.available_seats + booking.seat_ids.length;
+    const newAvailableSeats = show.available_seats + 1;
     await BookingModel.updateAvailableSeats(booking.show_id, newAvailableSeats);
 
     await conn.query("COMMIT");

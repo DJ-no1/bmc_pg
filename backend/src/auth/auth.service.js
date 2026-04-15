@@ -1,10 +1,12 @@
 import bcryptjs from "bcryptjs";
+import crypto from "crypto";
 import UserModel from "./auth.model.js";
 import {
     generateAccessToken,
     generateRefreshToken,
     verifyRefreshToken,
 } from "../common/utils/jwt.utils.js";
+import { sendVerificationEmail } from "../common/config/email.js";
 
 class AuthService {
     static async register(email, password, name) {
@@ -26,6 +28,20 @@ class AuthService {
 
         const user = await UserModel.createUser(email, passwordHash, name);
 
+        // Generate verification token (valid for 24 hours)
+        const verificationToken = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+        await UserModel.saveVerificationToken(user.id, verificationToken, expiresAt);
+
+        // Send verification email
+        try {
+            await sendVerificationEmail(user.email, verificationToken, user.name);
+        } catch (emailError) {
+            console.error("Failed to send verification email:", emailError);
+            // Don't fail registration if email fails, but log the error
+        }
+
         const accessToken = generateAccessToken({ id: user.id, email: user.email });
         const refreshToken = generateRefreshToken({ id: user.id, email: user.email });
 
@@ -35,9 +51,11 @@ class AuthService {
                 email: user.email,
                 name: user.name,
                 role: user.role,
+                is_verified: user.is_verified,
             },
             accessToken,
             refreshToken,
+            message: "Registration successful. Please check your email to verify your account.",
         };
     }
 
@@ -56,6 +74,22 @@ class AuthService {
             throw new Error("Invalid email or password");
         }
 
+        // Check if email is verified
+        if (!user.is_verified) {
+            // Resend verification email if expired
+            const verificationToken = crypto.randomBytes(32).toString("hex");
+            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            await UserModel.saveVerificationToken(user.id, verificationToken, expiresAt);
+
+            try {
+                await sendVerificationEmail(user.email, verificationToken, user.name);
+            } catch (emailError) {
+                console.error("Failed to resend verification email:", emailError);
+            }
+
+            throw new Error("Email not verified. Verification email has been sent to your inbox.");
+        }
+
         const accessToken = generateAccessToken({ id: user.id, email: user.email });
         const refreshToken = generateRefreshToken({ id: user.id, email: user.email });
 
@@ -65,9 +99,33 @@ class AuthService {
                 email: user.email,
                 name: user.name,
                 role: user.role,
+                is_verified: user.is_verified,
             },
             accessToken,
             refreshToken,
+        };
+    }
+
+    static async verifyEmail(token) {
+        if (!token) {
+            throw new Error("Verification token is required");
+        }
+
+        const user = await UserModel.verifyEmail(token);
+
+        if (!user) {
+            throw new Error("Invalid or expired verification token");
+        }
+
+        return {
+            message: "Email verified successfully!",
+            user: {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                is_verified: user.is_verified,
+            },
         };
     }
 

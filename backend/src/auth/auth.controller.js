@@ -8,7 +8,7 @@ class AuthController {
 
             res.status(201).json({
                 success: true,
-                message: "User registered successfully",
+                message: result.message,
                 data: result,
             });
         } catch (error) {
@@ -33,6 +33,25 @@ class AuthController {
         } catch (error) {
             console.error("Login error:", error.message);
             res.status(401).json({
+                success: false,
+                message: error.message,
+            });
+        }
+    }
+
+    static async verifyEmail(req, res) {
+        try {
+            const { token } = req.params;
+            const result = await AuthService.verifyEmail(token);
+
+            res.status(200).json({
+                success: true,
+                message: result.message,
+                data: result.user,
+            });
+        } catch (error) {
+            console.error("Email verification error:", error.message);
+            res.status(400).json({
                 success: false,
                 message: error.message,
             });
