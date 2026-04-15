@@ -73,6 +73,37 @@
                 <p id="movieError" class="error-message"></p>
             </form>
 
+            <!-- Edit Movie Form -->
+            <form id="editMovieForm" class="admin-form" style="display: none;">
+                <h4>Edit Movie</h4>
+                <input type="hidden" id="editMovieId">
+                <div class="form-group">
+                    <label for="editMovieTitle">Title:</label>
+                    <input type="text" id="editMovieTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="editMovieGenre">Genre:</label>
+                    <input type="text" id="editMovieGenre" required>
+                </div>
+                <div class="form-group">
+                    <label for="editMovieDuration">Duration (mins):</label>
+                    <input type="number" id="editMovieDuration" required>
+                </div>
+                <div class="form-group">
+                    <label for="editMovieRating">Rating (1-10):</label>
+                    <input type="number" id="editMovieRating" min="1" max="10" required>
+                </div>
+                <div class="form-group">
+                    <label for="editMovieDescription">Description:</label>
+                    <textarea id="editMovieDescription" required></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Update Movie</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleEditMovieForm()">Cancel</button>
+                </div>
+                <p id="editMovieError" class="error-message"></p>
+            </form>
+
             <!-- Movies List -->
             <div id="moviesListContainer" class="items-list">
                 <p class="loading">Loading movies...</p>
@@ -119,6 +150,41 @@
                     <button type="button" class="btn btn-secondary" onclick="toggleAddShowForm()">Cancel</button>
                 </div>
                 <p id="showError" class="error-message"></p>
+            </form>
+
+            <!-- Edit Show Form -->
+            <form id="editShowForm" class="admin-form" style="display: none;">
+                <h4>Edit Show</h4>
+                <input type="hidden" id="editShowId">
+                <div class="form-group">
+                    <label for="editShowMovieId">Movie:</label>
+                    <select id="editShowMovieId" required></select>
+                </div>
+                <div class="form-group">
+                    <label for="editShowDate">Show Date:</label>
+                    <input type="date" id="editShowDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="editShowTime">Show Time:</label>
+                    <input type="time" id="editShowTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="editTheatreName">Theatre Name:</label>
+                    <input type="text" id="editTheatreName" required>
+                </div>
+                <div class="form-group">
+                    <label for="editTicketPrice">Ticket Price (₹):</label>
+                    <input type="number" id="editTicketPrice" required>
+                </div>
+                <div class="form-group">
+                    <label for="editTotalSeats">Total Seats:</label>
+                    <input type="number" id="editTotalSeats" required>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Update Show</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleEditShowForm()">Cancel</button>
+                </div>
+                <p id="editShowError" class="error-message"></p>
             </form>
 
             <!-- Shows List -->
@@ -310,14 +376,108 @@
             }
         }
 
-        function editMovie(id) {
-            alert('Edit functionality coming soon');
+        let currentEditMovieData = null;
+
+        function toggleEditMovieForm() {
+            const form = document.getElementById('editMovieForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            if (form.style.display === 'none') {
+                document.getElementById('editMovieForm').reset();
+            }
         }
 
-        function editShow(id) {
-            alert('Edit functionality coming soon');
+        async function editMovie(id) {
+            try {
+                const movie = await api.getMovieById(id);
+                document.getElementById('editMovieId').value = movie.id;
+                document.getElementById('editMovieTitle').value = movie.title;
+                document.getElementById('editMovieGenre').value = movie.genre;
+                document.getElementById('editMovieDuration').value = movie.duration;
+                document.getElementById('editMovieRating').value = movie.rating;
+                document.getElementById('editMovieDescription').value = movie.description;
+                document.getElementById('editMovieForm').style.display = 'block';
+                document.getElementById('addMovieForm').style.display = 'none';
+                window.scrollTo(0, 0);
+            } catch (error) {
+                alert('Error loading movie details: ' + error.message);
+            }
         }
-    </script>
+
+        document.getElementById('editMovieForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const id = document.getElementById('editMovieId').value;
+                await api.updateMovie(id, {
+                    title: document.getElementById('editMovieTitle').value,
+                    genre: document.getElementById('editMovieGenre').value,
+                    duration: parseInt(document.getElementById('editMovieDuration').value),
+                    rating: parseFloat(document.getElementById('editMovieRating').value),
+                    description: document.getElementById('editMovieDescription').value
+                });
+                alert('Movie updated successfully!');
+                toggleEditMovieForm();
+                loadAdminMovies();
+                loadMovieOptions();
+            } catch (error) {
+                document.getElementById('editMovieError').textContent = error.message;
+            }
+        });
+
+        function toggleEditShowForm() {
+            const form = document.getElementById('editShowForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+            if (form.style.display === 'none') {
+                document.getElementById('editShowForm').reset();
+            }
+        }
+
+        async function editShow(id) {
+            try {
+                const show = await api.getShowById(id);
+                const movies = await api.getMovies();
+                
+                // Populate options
+                const select = document.getElementById('editShowMovieId');
+                select.innerHTML = movies.map(m => `<option value="${m.id}">${m.title}</option>`).join('');
+                
+                document.getElementById('editShowId').value = show.id;
+                document.getElementById('editShowMovieId').value = show.movie_id;
+                // HTML date fields expect YYYY-MM-DD
+                const dateObj = new Date(show.show_date);
+                const dateStr = dateObj.toISOString().split('T')[0];
+                document.getElementById('editShowDate').value = dateStr;
+                document.getElementById('editShowTime').value = show.show_time;
+                document.getElementById('editTheatreName').value = show.theatre_name;
+                document.getElementById('editTicketPrice').value = show.ticket_price;
+                document.getElementById('editTotalSeats').value = show.total_seats;
+                
+                document.getElementById('editShowForm').style.display = 'block';
+                document.getElementById('addShowForm').style.display = 'none';
+                window.scrollTo(0, 0);
+            } catch (error) {
+                alert('Error loading show details: ' + error.message);
+            }
+        }
+
+        document.getElementById('editShowForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const id = document.getElementById('editShowId').value;
+                await api.updateShow(id, {
+                    movie_id: parseInt(document.getElementById('editShowMovieId').value),
+                    show_date: document.getElementById('editShowDate').value,
+                    show_time: document.getElementById('editShowTime').value,
+                    theatre_name: document.getElementById('editTheatreName').value,
+                    ticket_price: parseInt(document.getElementById('editTicketPrice').value),
+                    total_seats: parseInt(document.getElementById('editTotalSeats').value)
+                });
+                alert('Show updated successfully!');
+                toggleEditShowForm();
+                loadAdminShows();
+            } catch (error) {
+                document.getElementById('editShowError').textContent = error.message;
+            }
+        });
+        </script>
 </body>
-
 </html>

@@ -594,6 +594,7 @@ main {
     padding: var(--space-xl);
     border-radius: var(--radius-lg);
     border: 1px solid var(--color-border);
+    overflow-x: auto;
 }
 
 .screen {
@@ -619,6 +620,7 @@ main {
     justify-content: center;
     align-items: center;
     gap: var(--space-sm);
+    flex-wrap: nowrap;
 }
 
 .row-label {
@@ -643,6 +645,7 @@ main {
     align-items: center;
     justify-content: center;
     color: var(--color-text-secondary);
+    flex-shrink: 0;
 }
 
 .seat:hover:not(.booked) {

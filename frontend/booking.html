@@ -98,8 +98,11 @@
                 showData = await api.getShowById(showId);
                 seatsData = await api.getSeatsForShow(showId);
 
+                const showDate = new Date(showData.show_date).toLocaleDateString();
+                const showTime = new Date(showData.show_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
                 document.getElementById('showDetails').textContent =
-                    `${showData.theatre_name} - ${new Date(showData.show_date).toLocaleDateString()} at ${showData.show_time}`;
+                    `${showData.movietitle} | ${showData.theatre_name} - ${showDate} at ${showTime}`;
                 document.getElementById('seatPrice').textContent = `₹${showData.ticket_price}`;
 
                 renderSeats();
@@ -115,8 +118,8 @@
 
             // Group seats by row
             seatsData.forEach(seat => {
-                if (!rows[seat.row]) rows[seat.row] = [];
-                rows[seat.row].push(seat);
+                if (!rows[seat.row_letter]) rows[seat.row_letter] = [];
+                rows[seat.row_letter].push(seat);
             });
 
             let html = '';
@@ -125,13 +128,13 @@
                 html += `<span class="row-label">${row}</span>`;
 
                 rows[row].sort((a, b) => a.seat_number - b.seat_number).forEach(seat => {
-                    const isBooked = seat.is_booked;
+                    const isBooked = seat.isbooked;
                     const isSelected = selectedSeats.find(s => s.id === seat.id);
                     const seatClass = `seat ${isBooked ? 'booked' : ''} ${isSelected ? 'selected' : ''}`;
 
                     html += `<button class="${seatClass}" 
-                        onclick="toggleSeat(${seat.id}, ${seat.is_booked}, this)"
-                        title="Row ${seat.row} - Seat ${seat.seat_number}"
+                        onclick="toggleSeat(${seat.id}, ${isBooked}, this)"
+                        title="Row ${seat.row_letter} - Seat ${seat.seat_number}"
                         ${isBooked ? 'disabled' : ''}>
                         ${seat.seat_number}
                     </button>`;
@@ -164,7 +167,7 @@
         function updateSummary() {
             const seatsText = selectedSeats.length === 0
                 ? 'None'
-                : selectedSeats.map(s => `${s.row}${s.seat_number}`).join(', ');
+                : selectedSeats.map(s => `${s.row_letter}${s.seat_number}`).join(', ');
 
             document.getElementById('selectedSeats').textContent = seatsText;
             document.getElementById('totalSeats').textContent = selectedSeats.length;
